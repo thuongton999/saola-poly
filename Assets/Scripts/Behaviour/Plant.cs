@@ -12,16 +12,11 @@ public class Plant : LivingEntity {
 
         transform.localScale = Vector3.one * amountRemaining;
 
-        if (amountRemaining <= 0) {
+        if (amountRemaining <= 0)
             Die (CauseOfDeath.Eaten);
-        }
 
         return amountConsumed;
     }
 
-    public float AmountRemaining {
-        get {
-            return amountRemaining;
-        }
-    }
+    public float AmountRemaining => amountRemaining;
 }

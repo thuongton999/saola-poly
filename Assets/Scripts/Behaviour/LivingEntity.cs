@@ -23,18 +23,20 @@ public class LivingEntity : MonoBehaviour {
         var meshRenderer = transform.GetComponentInChildren<MeshRenderer> ();
         for (int i = 0; i < meshRenderer.sharedMaterials.Length; i++)
         {
-            if (meshRenderer.sharedMaterials[i] == material) {
-                material = meshRenderer.materials[i];
-                break;
-            }
+            if (meshRenderer.sharedMaterials[i] != material) continue;
+            material = meshRenderer.materials[i];
+            break;
         }
     }
 
     protected virtual void Die (CauseOfDeath cause) {
-        if (!dead) {
-            dead = true;
-            Environment.RegisterDeath (this);
-            Destroy (gameObject);
-        }
+        if (dead) return;
+        dead = true;
+        Environment.RegisterDeath (this);
+        Destroy (gameObject);
+    }
+
+    public void KilledBy (LivingEntity killer) {
+        Die (CauseOfDeath.Eaten);
     }
 }

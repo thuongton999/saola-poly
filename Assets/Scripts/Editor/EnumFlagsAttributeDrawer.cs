@@ -97,21 +97,15 @@ public class EnumFlagsAttributeDrawer : PropertyDrawer
                 var menu = new GenericMenu();
                 foreach (string enumName in enumNames)
                 {
-                    if (activeEnumNames.Contains(enumName) == false)
-                    {
-                        menu.AddItem(new GUIContent(enumNameToDisplayName[enumName]),
-                            false, data =>
-                            {
-                                if (enumNameToValue[(string)data] == 0)
-                                {
-                                    activeEnumNames.Clear();
-                                }
-                                activeEnumNames.Add((string)data);
-                                SaveActiveValues();
-                                ParseActiveEnumNames();
-                            },
-                            enumName);
-                    }
+                    if (activeEnumNames.Contains(enumName) != false) continue;
+                    menu.AddItem(new GUIContent(enumNameToDisplayName[enumName]), false, data =>
+                        {
+                            if (enumNameToValue[(string)data] == 0) activeEnumNames.Clear();
+                            activeEnumNames.Add((string)data);
+                            SaveActiveValues();
+                            ParseActiveEnumNames();
+                        },
+                        enumName);
                 }
                 menu.ShowAsContext();
             },
@@ -130,19 +124,15 @@ public class EnumFlagsAttributeDrawer : PropertyDrawer
         activeEnumNames.Clear();
         foreach (string enumValue in enumNames)
         {
-            if (IsFlagSet(enumValue))
-            {
-                activeEnumNames.Add(enumValue);
-            }
+            if (!IsFlagSet(enumValue)) continue;
+            activeEnumNames.Add(enumValue);
         }
     }
 
     private bool IsFlagSet(string enumValue)
     {
         if (enumNameToValue[enumValue] == 0)
-        {
             return serializedProperty.intValue == 0;
-        }
         return (serializedProperty.intValue & enumNameToValue[enumValue]) == enumNameToValue[enumValue];
     }
 

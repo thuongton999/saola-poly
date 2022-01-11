@@ -69,13 +69,10 @@ public class Environment : MonoBehaviour {
 
     public static Coord SenseWater (Coord coord) {
         var closestWaterCoord = closestVisibleWaterMap[coord.x, coord.y];
-        if (closestWaterCoord != Coord.invalid) {
-            float sqrDst = (tileCentres[coord.x, coord.y] - tileCentres[closestWaterCoord.x, closestWaterCoord.y]).sqrMagnitude;
-            if (sqrDst <= Animal.maxViewDistance * Animal.maxViewDistance) {
-                return closestWaterCoord;
-            }
-        }
-        return Coord.invalid;
+        if (closestWaterCoord == Coord.invalid) return Coord.invalid;
+        float sqrDst = (tileCentres[coord.x, coord.y] - tileCentres[closestWaterCoord.x, closestWaterCoord.y]).sqrMagnitude;
+        if (sqrDst > Animal.maxViewDistance * Animal.maxViewDistance) return Coord.invalid;
+        return closestWaterCoord;
     }
 
     public static LivingEntity SenseFood (Coord coord, Animal self, System.Func<LivingEntity, LivingEntity, int> foodPreference) {
@@ -83,9 +80,7 @@ public class Environment : MonoBehaviour {
 
         List<Species> prey = preyBySpecies[self.species];
         for (int i = 0; i < prey.Count; i++) {
-
             Map speciesMap = speciesMaps[prey[i]];
-
             foodSources.AddRange (speciesMap.GetEntities (coord, Animal.maxViewDistance));
         }
 
@@ -95,11 +90,9 @@ public class Environment : MonoBehaviour {
         // Return first visible food source
         for (int i = 0; i < foodSources.Count; i++) {
             Coord targetCoord = foodSources[i].coord;
-            if (EnvironmentUtility.TileIsVisibile (coord.x, coord.y, targetCoord.x, targetCoord.y)) {
-                return foodSources[i];
-            }
+            if (!EnvironmentUtility.TileIsVisibile (coord.x, coord.y, targetCoord.x, targetCoord.y)) continue;
+            return foodSources[i];
         }
-
         return null;
     }
 
@@ -111,20 +104,17 @@ public class Environment : MonoBehaviour {
 
         for (int i = 0; i < visibleEntities.Count; i++) {
             var visibleAnimal = (Animal) visibleEntities[i];
-            if (visibleAnimal != self && visibleAnimal.genes.isMale != self.genes.isMale) {
-                if (visibleAnimal.currentAction == CreatureAction.SearchingForMate) {
-                    potentialMates.Add (visibleAnimal);
-                }
-            }
+            if (visibleAnimal == self || visibleAnimal.genes.isMale == self.genes.isMale) continue;
+            if (visibleAnimal.currentAction != CreatureAction.SearchingForMate) continue;
+            potentialMates.Add (visibleAnimal);
         }
-
         return potentialMates;
     }
 
-    public static Surroundings Sense (Coord coord) {
-        var closestPlant = speciesMaps[Species.Plant].ClosestEntity (coord, Animal.maxViewDistance);
+    public static Surroundings Sense (Coord coord, Species species) {
+        var closestFoodTarget = speciesMaps[species].ClosestEntity (coord, Animal.maxViewDistance);
         var surroundings = new Surroundings ();
-        surroundings.nearestFoodSource = closestPlant;
+        surroundings.nearestFoodSource = closestFoodTarget;
         surroundings.nearestWaterTile = closestVisibleWaterMap[coord.x, coord.y];
 
         return surroundings;
@@ -132,54 +122,52 @@ public class Environment : MonoBehaviour {
 
     public static Coord GetNextTileRandom (Coord current) {
         var neighbours = walkableNeighboursMap[current.x, current.y];
-        if (neighbours.Length == 0) {
-            return current;
-        }
-        return neighbours[prng.Next (neighbours.Length)];
+        if (neighbours.Length != 0) 
+            return neighbours[prng.Next (neighbours.Length)];
+        return current;
     }
 
     /// Get random neighbour tile, weighted towards those in similar direction as currently facing
     public static Coord GetNextTileWeighted (Coord current, Coord previous, double forwardProbability = 0.2, int weightingIterations = 3) {
-
-        if (current == previous) {
-
+        if (current == previous)
             return GetNextTileRandom (current);
-        }
 
         Coord forwardOffset = (current - previous);
         // Random chance of returning foward tile (if walkable)
         if (prng.NextDouble () < forwardProbability) {
             Coord forwardCoord = current + forwardOffset;
+            if (forwardCoord.x < 0) goto ChooseBestNeighbour;
+            if (forwardCoord.x >= size) goto ChooseBestNeighbour;
+            if (forwardCoord.y < 0) goto ChooseBestNeighbour;
+            if (forwardCoord.y >= size) goto ChooseBestNeighbour;
+            if (!walkable[forwardCoord.x, forwardCoord.y]) goto ChooseBestNeighbour;
+            return forwardCoord;
+        }
 
-            if (forwardCoord.x >= 0 && forwardCoord.x < size && forwardCoord.y >= 0 && forwardCoord.y < size) {
-                if (walkable[forwardCoord.x, forwardCoord.y]) {
-                    return forwardCoord;
+        ChooseBestNeighbour:
+        {
+            // Get walkable neighbours
+            var neighbours = walkableNeighboursMap[current.x, current.y];
+            if (neighbours.Length == 0)
+                return current;
+
+            // From n random tiles, pick the one that is most aligned with the forward direction:
+            Vector2 forwardDir = new Vector2 (forwardOffset.x, forwardOffset.y).normalized;
+            float bestScore = float.MinValue;
+            Coord bestNeighbour = current;
+
+            for (int i = 0; i < weightingIterations; i++) {
+                Coord neighbour = neighbours[prng.Next (neighbours.Length)];
+                Vector2 offset = neighbour - current;
+                float score = Vector2.Dot (offset.normalized, forwardDir);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestNeighbour = neighbour;
                 }
             }
+
+            return bestNeighbour;
         }
-
-        // Get walkable neighbours
-        var neighbours = walkableNeighboursMap[current.x, current.y];
-        if (neighbours.Length == 0) {
-            return current;
-        }
-
-        // From n random tiles, pick the one that is most aligned with the forward direction:
-        Vector2 forwardDir = new Vector2 (forwardOffset.x, forwardOffset.y).normalized;
-        float bestScore = float.MinValue;
-        Coord bestNeighbour = current;
-
-        for (int i = 0; i < weightingIterations; i++) {
-            Coord neighbour = neighbours[prng.Next (neighbours.Length)];
-            Vector2 offset = neighbour - current;
-            float score = Vector2.Dot (offset.normalized, forwardDir);
-            if (score > bestScore) {
-                bestScore = score;
-                bestNeighbour = neighbour;
-            }
-        }
-
-        return bestNeighbour;
     }
 
     // Call terrain generator and cache useful info
@@ -209,24 +197,22 @@ public class Environment : MonoBehaviour {
 
         // Store predator/prey relationships for all species
         for (int i = 0; i < initialPopulations.Length; i++) {
+            if (!(initialPopulations[i].prefab is Animal)) continue;
+            Animal hunter = (Animal) initialPopulations[i].prefab;
+            Species diet = hunter.diet;
 
-            if (initialPopulations[i].prefab is Animal) {
-                Animal hunter = (Animal) initialPopulations[i].prefab;
-                Species diet = hunter.diet;
-
-                for (int huntedSpeciesIndex = 0; huntedSpeciesIndex < numSpecies; huntedSpeciesIndex++) {
-                    int bit = ((int) diet >> huntedSpeciesIndex) & 1;
-                    // this bit of diet mask set (i.e. the hunter eats this species)
-                    if (bit == 1) {
-                        int huntedSpecies = 1 << huntedSpeciesIndex;
-                        preyBySpecies[hunter.species].Add ((Species) huntedSpecies);
-                        predatorsBySpecies[(Species) huntedSpecies].Add (hunter.species);
-                    }
+            for (int huntedSpeciesIndex = 0; huntedSpeciesIndex < numSpecies; huntedSpeciesIndex++) {
+                int bit = ((int) diet >> huntedSpeciesIndex) & 1;
+                // this bit of diet mask set (i.e. the hunter eats this species)
+                if (bit == 1) {
+                    int huntedSpecies = 1 << huntedSpeciesIndex;
+                    preyBySpecies[hunter.species].Add ((Species) huntedSpecies);
+                    predatorsBySpecies[(Species) huntedSpecies].Add (hunter.species);
                 }
             }
         }
 
-        //LogPredatorPreyRelationships ();
+        LogPredatorPreyRelationships ();
 
         SpawnTrees ();
 
@@ -235,23 +221,24 @@ public class Environment : MonoBehaviour {
         // Find and store all walkable neighbours for each walkable tile on the map
         for (int y = 0; y < terrainData.size; y++) {
             for (int x = 0; x < terrainData.size; x++) {
-                if (walkable[x, y]) {
-                    List<Coord> walkableNeighbours = new List<Coord> ();
-                    for (int offsetY = -1; offsetY <= 1; offsetY++) {
-                        for (int offsetX = -1; offsetX <= 1; offsetX++) {
-                            if (offsetX != 0 || offsetY != 0) {
-                                int neighbourX = x + offsetX;
-                                int neighbourY = y + offsetY;
-                                if (neighbourX >= 0 && neighbourX < size && neighbourY >= 0 && neighbourY < size) {
-                                    if (walkable[neighbourX, neighbourY]) {
-                                        walkableNeighbours.Add (new Coord (neighbourX, neighbourY));
-                                    }
-                                }
-                            }
-                        }
+                if (!walkable[x, y]) continue;
+                List<Coord> walkableNeighbours = new List<Coord> ();
+                for (int offsetY = -1; offsetY <= 1; offsetY++) {
+                    for (int offsetX = -1; offsetX <= 1; offsetX++) {
+                        if (offsetX == 0 && offsetY == 0) continue;
+                        int neighbourX = x + offsetX;
+                        int neighbourY = y + offsetY;
+
+                        if (neighbourX < 0) continue;
+                        if (neighbourX >= size) continue;
+                        if (neighbourY < 0) continue;
+                        if (neighbourY >= size) continue;
+                        if (!walkable[neighbourX, neighbourY]) continue;
+
+                        walkableNeighbours.Add (new Coord (neighbourX, neighbourY));
                     }
-                    walkableNeighboursMap[x, y] = walkableNeighbours.ToArray ();
                 }
+                walkableNeighboursMap[x, y] = walkableNeighbours.ToArray ();
             }
         }
 
@@ -263,9 +250,9 @@ public class Environment : MonoBehaviour {
         for (int offsetY = -viewRadius; offsetY <= viewRadius; offsetY++) {
             for (int offsetX = -viewRadius; offsetX <= viewRadius; offsetX++) {
                 int sqrOffsetDst = offsetX * offsetX + offsetY * offsetY;
-                if ((offsetX != 0 || offsetY != 0) && sqrOffsetDst <= sqrViewRadius) {
-                    viewOffsets.Add (new Coord (offsetX, offsetY));
-                }
+                if (offsetX == 0 && offsetY == 0) continue;
+                if (sqrOffsetDst > sqrViewRadius) continue;
+                viewOffsets.Add (new Coord (offsetX, offsetY));
             }
         }
         viewOffsets.Sort ((a, b) => (a.x * a.x + a.y * a.y).CompareTo (b.x * b.x + b.y * b.y));
@@ -280,15 +267,16 @@ public class Environment : MonoBehaviour {
                     for (int i = 0; i < viewOffsets.Count; i++) {
                         int targetX = x + viewOffsetsArr[i].x;
                         int targetY = y + viewOffsetsArr[i].y;
-                        if (targetX >= 0 && targetX < size && targetY >= 0 && targetY < size) {
-                            if (terrainData.shore[targetX, targetY]) {
-                                if (EnvironmentUtility.TileIsVisibile (x, y, targetX, targetY)) {
-                                    closestVisibleWaterMap[x, y] = new Coord (targetX, targetY);
-                                    foundWater = true;
-                                    break;
-                                }
-                            }
-                        }
+
+                        if (targetX < 0) continue;
+                        if (targetX >= size) continue;
+                        if (targetY < 0) continue;
+                        if (targetY >= size) continue;
+                        if (!terrainData.shore[targetX, targetY]) continue;
+                        if (!EnvironmentUtility.TileIsVisibile (x, y, targetX, targetY)) continue;
+                        closestVisibleWaterMap[x, y] = new Coord (targetX, targetY);
+                        foundWater = true;
+                        break;
                     }
                 }
                 if (!foundWater) {
@@ -312,32 +300,31 @@ public class Environment : MonoBehaviour {
 
         for (int y = 0; y < terrainData.size; y++) {
             for (int x = 0; x < terrainData.size; x++) {
-                if (walkable[x, y]) {
-                    if (prng.NextDouble () < treeProbability) {
-                        // Randomize rot/scale
-                        float rotX = Mathf.Lerp (-maxRot, maxRot, (float) spawnPrng.NextDouble ());
-                        float rotZ = Mathf.Lerp (-maxRot, maxRot, (float) spawnPrng.NextDouble ());
-                        float rotY = (float) spawnPrng.NextDouble () * 360f;
-                        Quaternion rot = Quaternion.Euler (rotX, rotY, rotZ);
-                        float scale = 1 + ((float) spawnPrng.NextDouble () * 2 - 1) * maxScaleDeviation;
+                if (!walkable[x, y]) continue;
+                if (prng.NextDouble () < treeProbability) {
+                    // Randomize rot/scale
+                    float rotX = Mathf.Lerp (-maxRot, maxRot, (float) spawnPrng.NextDouble ());
+                    float rotZ = Mathf.Lerp (-maxRot, maxRot, (float) spawnPrng.NextDouble ());
+                    float rotY = (float) spawnPrng.NextDouble () * 360f;
+                    Quaternion rot = Quaternion.Euler (rotX, rotY, rotZ);
+                    float scale = 1 + ((float) spawnPrng.NextDouble () * 2 - 1) * maxScaleDeviation;
 
-                        // Randomize colour
-                        float col = Mathf.Lerp (minCol, 1, (float) spawnPrng.NextDouble ());
-                        float r = col + ((float) spawnPrng.NextDouble () * 2 - 1) * colVariationFactor;
-                        float g = col + ((float) spawnPrng.NextDouble () * 2 - 1) * colVariationFactor;
-                        float b = col + ((float) spawnPrng.NextDouble () * 2 - 1) * colVariationFactor;
+                    // Randomize colour
+                    float col = Mathf.Lerp (minCol, 1, (float) spawnPrng.NextDouble ());
+                    float r = col + ((float) spawnPrng.NextDouble () * 2 - 1) * colVariationFactor;
+                    float g = col + ((float) spawnPrng.NextDouble () * 2 - 1) * colVariationFactor;
+                    float b = col + ((float) spawnPrng.NextDouble () * 2 - 1) * colVariationFactor;
 
-                        // Spawn
-                        MeshRenderer tree = Instantiate (treePrefab, tileCentres[x, y], rot);
-                        tree.transform.parent = treeHolder;
-                        tree.transform.localScale = Vector3.one * scale;
-                        tree.material.color = new Color (r, g, b);
+                    // Spawn
+                    MeshRenderer tree = Instantiate (treePrefab, tileCentres[x, y], rot);
+                    tree.transform.parent = treeHolder;
+                    tree.transform.localScale = Vector3.one * scale;
+                    tree.material.color = new Color (r, g, b);
 
-                        // Mark tile unwalkable
-                        walkable[x, y] = false;
-                    } else {
-                        walkableCoords.Add (new Coord (x, y));
-                    }
+                    // Mark tile unwalkable
+                    walkable[x, y] = false;
+                } else {
+                    walkableCoords.Add (new Coord (x, y));
                 }
             }
         }

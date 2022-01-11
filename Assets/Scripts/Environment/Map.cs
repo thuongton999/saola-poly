@@ -39,11 +39,9 @@ public class Map {
             for (int j = 0; j < map[regionCoord.x, regionCoord.y].Count; j++) {
                 LivingEntity entity = map[regionCoord.x, regionCoord.y][j];
                 float sqrDst = Coord.SqrDistance (entity.coord, origin);
-                if (sqrDst < sqrViewDst) {
-                    if (EnvironmentUtility.TileIsVisibile (origin.x, origin.y, entity.coord.x, entity.coord.y)) {
-                        visibleEntities.Add (entity);
-                    }
-                }
+                if (sqrDst >= sqrViewDst) continue;
+                if (!EnvironmentUtility.TileIsVisibile (origin.x, origin.y, entity.coord.x, entity.coord.y)) continue;
+                visibleEntities.Add (entity);
             }
         }
 
@@ -67,12 +65,10 @@ public class Map {
             for (int j = 0; j < map[regionCoord.x, regionCoord.y].Count; j++) {
                 LivingEntity entity = map[regionCoord.x, regionCoord.y][j];
                 float sqrDst = Coord.SqrDistance (entity.coord, origin);
-                if (sqrDst < closestSqrDst) {
-                    if (EnvironmentUtility.TileIsVisibile (origin.x, origin.y, entity.coord.x, entity.coord.y)) {
-                        closestSqrDst = sqrDst;
-                        closestEntity = entity;
-                    }
-                }
+                if (sqrDst >= closestSqrDst) continue;
+                if (!EnvironmentUtility.TileIsVisibile (origin.x, origin.y, entity.coord.x, entity.coord.y)) continue;
+                closestSqrDst = sqrDst;
+                closestEntity = entity;
             }
         }
 
@@ -95,16 +91,18 @@ public class Map {
                 int viewedRegionX = originRegionX + offsetX;
                 int viewedRegionY = originRegionY + offsetY;
 
-                if (viewedRegionX >= 0 && viewedRegionX < numRegions && viewedRegionY >= 0 && viewedRegionY < numRegions) {
-                    // Calculate distance from view coord to closest edge of region to test if region is in range
-                    float ox = Mathf.Max (0, Mathf.Abs (viewCentre.x - centres[viewedRegionX, viewedRegionY].x) - regionSize / 2f);
-                    float oy = Mathf.Max (0, Mathf.Abs (viewCentre.y - centres[viewedRegionX, viewedRegionY].y) - regionSize / 2f);
-                    float sqrDstFromRegionEdge = ox * ox + oy * oy;
-                    if (sqrDstFromRegionEdge <= sqrViewDst) {
-                        RegionInfo info = new RegionInfo (new Coord (viewedRegionX, viewedRegionY), sqrDstFromRegionEdge);
-                        regions.Add (info);
-                    }
-                }
+                if (viewedRegionX < 0) continue;
+                if (viewedRegionY < 0) continue;
+                if (viewedRegionX >= numRegions) continue;
+                if (viewedRegionY >= numRegions) continue;
+
+                // Calculate distance from view coord to closest edge of region to test if region is in range
+                float ox = Mathf.Max (0, Mathf.Abs (viewCentre.x - centres[viewedRegionX, viewedRegionY].x) - regionSize / 2f);
+                float oy = Mathf.Max (0, Mathf.Abs (viewCentre.y - centres[viewedRegionX, viewedRegionY].y) - regionSize / 2f);
+                float sqrDstFromRegionEdge = ox * ox + oy * oy;
+                if (sqrDstFromRegionEdge > sqrViewDst) continue;
+                RegionInfo info = new RegionInfo (new Coord (viewedRegionX, viewedRegionY), sqrDstFromRegionEdge);
+                regions.Add (info);
             }
         }
 
@@ -158,7 +156,7 @@ public class Map {
         }
     }
 
-    public void DrawDebugGizmos (Coord coord, float viewDst) {
+    public void OnDrawGizmos (Coord coord, float viewDst) {
         // Settings:
         bool showViewedRegions = true;
         bool showOccupancy = false;
@@ -190,12 +188,13 @@ public class Map {
                 for (int x = 0; x < numRegions; x++) {
                     Vector3 centre = new Vector3 (centres[x, y].x, height, centres[x, y].y);
                     for (int i = 0; i < regionsInView.Count; i++) {
-                        if (regionsInView[i].coord.x == x && regionsInView[i].coord.y == y) {
-                            var prevCol = Gizmos.color;
-                            Gizmos.color = new Color (1, 0, 0, 1 - i / Mathf.Max (1, regionsInView.Count - 1f) * .5f);
-                            Gizmos.DrawCube (centre, new Vector3 (regionSize, .1f, regionSize));
-                            Gizmos.color = prevCol;
-                        }
+                        if (regionsInView[i].coord.x != x) continue;
+                        if (regionsInView[i].coord.y != y) continue;
+
+                        var prevCol = Gizmos.color;
+                        Gizmos.color = new Color (1, 0, 0, 1 - i / Mathf.Max (1, regionsInView.Count - 1f) * .5f);
+                        Gizmos.DrawCube (centre, new Vector3 (regionSize, .1f, regionSize));
+                        Gizmos.color = prevCol;
                     }
                 }
             }
@@ -208,17 +207,17 @@ public class Map {
                     maxOccupants = Mathf.Max (maxOccupants, map[x, y].Count);
                 }
             }
-            if (maxOccupants > 0) {
+            if (maxOccupants > 0) goto ShowOccupancy;
+            ShowOccupancy: {
                 for (int y = 0; y < numRegions; y++) {
                     for (int x = 0; x < numRegions; x++) {
                         Vector3 centre = new Vector3 (centres[x, y].x, height, centres[x, y].y);
                         int numOccupants = map[x, y].Count;
-                        if (numOccupants > 0) {
-                            var prevCol = Gizmos.color;
-                            Gizmos.color = new Color (1, 0, 0, numOccupants / (float) maxOccupants);
-                            Gizmos.DrawCube (centre, new Vector3 (regionSize, .1f, regionSize));
-                            Gizmos.color = prevCol;
-                        }
+                        if (numOccupants <= 0) continue;
+                        var prevCol = Gizmos.color;
+                        Gizmos.color = new Color (1, 0, 0, numOccupants / (float) maxOccupants);
+                        Gizmos.DrawCube (centre, new Vector3 (regionSize, .1f, regionSize));
+                        Gizmos.color = prevCol;
                     }
                 }
             }
