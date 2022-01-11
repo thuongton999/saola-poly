@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class Fox : Animal {
-    AnimalStats foxStats;
+    public AnimalStats foxStats;
 
     public override void Init(Coord coord)
     {

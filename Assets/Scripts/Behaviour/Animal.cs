@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class Animal : LivingEntity, IAnimalStateSubject {
 
-    public const int maxViewDistance = 10;
+    public static int maxViewDistance = 10;
 
     [EnumFlags]
     public Species diet;
@@ -75,7 +75,7 @@ public class Animal : LivingEntity, IAnimalStateSubject {
 
     public void NotifyObservers () {
         foreach (var observer in stateObservers) {
-            observer.UpdateState (this);
+            observer?.UpdateState (this);
         }
     }
 
@@ -207,7 +207,8 @@ public class Animal : LivingEntity, IAnimalStateSubject {
     protected void LookAt (Coord target) {
         if (target == coord) return;
         Coord offset = target - coord;
-        transform.eulerAngles = Vector3.up * Mathf.Atan2 (offset.x, offset.y) * Mathf.Rad2Deg;
+        float angle = Mathf.Atan2 (offset.x, offset.y) * Mathf.Rad2Deg;
+        transform.eulerAngles = new Vector3 (transform.eulerAngles.x, angle, transform.eulerAngles.z);
     }
 
     void HandleInteractions () {
