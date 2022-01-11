@@ -1,8 +1,9 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Animal : LivingEntity {
+public class Animal : LivingEntity, IAnimalStateSubject {
 
     public const int maxViewDistance = 10;
 
@@ -32,6 +33,7 @@ public class Animal : LivingEntity {
     [Header ("State")]
     public float hunger;
     public float thirst;
+    List<IAnimalStateObserver> stateObservers = new List<IAnimalStateObserver> ();
 
     protected LivingEntity foodTarget;
     protected Coord waterTarget;
@@ -63,6 +65,20 @@ public class Animal : LivingEntity {
         ChooseNextAction ();
     }
 
+    public void RegisterObserver (IAnimalStateObserver observer) {
+        stateObservers.Add (observer);
+    }
+
+    public void RemoveObserver (IAnimalStateObserver observer) {
+        stateObservers.Remove (observer);
+    }
+
+    public void NotifyObservers () {
+        foreach (var observer in stateObservers) {
+            observer.UpdateState (this);
+        }
+    }
+
     protected virtual void Update () {
 
         // Increase hunger and thirst over time
@@ -81,6 +97,7 @@ public class Animal : LivingEntity {
             }
         }
 
+        NotifyObservers ();
         if (hunger >= 1) {
             Die (CauseOfDeath.Hunger);
         } else if (thirst >= 1) {
