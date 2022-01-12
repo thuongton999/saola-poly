@@ -237,7 +237,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2049470770078825671}
-  - component: {fileID: 9050003023806345381}
+  - component: {fileID: -7901866331647511140}
   m_Layer: 0
   m_Name: SaoLa
   m_TagString: Untagged
@@ -261,7 +261,7 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &9050003023806345381
+--- !u!114 &-7901866331647511140
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -270,7 +270,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1673929908761945725}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aa81e76bbb0534ab4a7eac5974e8565f, type: 3}
+  m_Script: {fileID: 11500000, guid: 5a31e6d02ff1951498717bf0dbf7e3bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   colourMaterialIndex: 0
@@ -289,6 +289,7 @@ MonoBehaviour:
   femaleColour: {r: 0, g: 0, b: 0, a: 0}
   hunger: 0
   thirst: 0
+  SaoLaStats: {fileID: 6138067794691010490}
 --- !u!1 &1783559134390275242
 GameObject:
   m_ObjectHideFlags: 0
@@ -1355,7 +1356,8 @@ PrefabInstance:
         type: 3}
       propertyPath: target
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1618445307102888796, guid: 46c299a824bb06b4383000e8b0eea5e1,
+        type: 3}
     - target: {fileID: 3916093769970791327, guid: c26f797f45e4fd14bbb42eeff0818d05,
         type: 3}
       propertyPath: m_AnchorMax.x
@@ -1471,6 +1473,11 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7140821186932758045, guid: c26f797f45e4fd14bbb42eeff0818d05,
+        type: 3}
+      propertyPath: m_Value
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8080211356587664842, guid: c26f797f45e4fd14bbb42eeff0818d05,
         type: 3}
       propertyPath: m_Name
@@ -1484,3 +1491,15 @@ RectTransform:
     type: 3}
   m_PrefabInstance: {fileID: 9023666633653671258}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &6138067794691010490 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2888017773184318176, guid: c26f797f45e4fd14bbb42eeff0818d05,
+    type: 3}
+  m_PrefabInstance: {fileID: 9023666633653671258}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 088955628a32b244b826a8d887702c67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

@@ -8,6 +8,7 @@ public class Billboard : MonoBehaviour
 
     void LateUpdate()
     {
+        if (target == null) return;
         transform.LookAt(transform.position + target.forward);
     }
 }

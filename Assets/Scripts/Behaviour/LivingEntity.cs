@@ -32,7 +32,7 @@ public class LivingEntity : MonoBehaviour {
     protected virtual void Die (CauseOfDeath cause) {
         if (dead) return;
         dead = true;
-        Environment.RegisterDeath (this);
+        Environment.RegisterDeath (this, cause);
         Destroy (gameObject);
     }
 

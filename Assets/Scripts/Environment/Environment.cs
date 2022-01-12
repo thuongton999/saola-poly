@@ -1,10 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using TerrainGeneration;
 using UnityEngine;
 
 public class Environment : MonoBehaviour {
-
     const int mapRegionSize = 10;
 
     public int seed;
@@ -31,6 +31,8 @@ public class Environment : MonoBehaviour {
 
     static Dictionary<Species, List<Species>> preyBySpecies;
     static Dictionary<Species, List<Species>> predatorsBySpecies;
+    static Dictionary<Species, int> populationBySpecies;
+    static Dictionary<CauseOfDeath, int> deathCountByCause;
 
     // array of visible tiles from any tile; value is Coord.invalid if no visible water tile
     static Coord[, ] closestVisibleWaterMap;
@@ -63,8 +65,10 @@ public class Environment : MonoBehaviour {
         speciesMaps[entity.species].Move (entity, from, to);
     }
 
-    public static void RegisterDeath (LivingEntity entity) {
+    public static void RegisterDeath (LivingEntity entity, CauseOfDeath cause) {
         speciesMaps[entity.species].Remove (entity, entity.coord);
+        // TODO: analyse cause of death and adjust population accordingly
+        deathCountByCause[cause]++;
     }
 
     public static Coord SenseWater (Coord coord) {
@@ -170,31 +174,20 @@ public class Environment : MonoBehaviour {
         }
     }
 
-    // Call terrain generator and cache useful info
-    void Init () {
-        var sw = System.Diagnostics.Stopwatch.StartNew ();
-
-        var terrainGenerator = FindObjectOfType<TerrainGenerator> ();
-        terrainData = terrainGenerator.Generate ();
-
-        tileCentres = terrainData.tileCentres;
-        walkable = terrainData.walkable;
-        size = terrainData.size;
-
-        int numSpecies = System.Enum.GetNames (typeof (Species)).Length;
-        preyBySpecies = new Dictionary<Species, List<Species>> ();
-        predatorsBySpecies = new Dictionary<Species, List<Species>> ();
-
-        // Init species maps
+    void InitSpeciesMaps (int numSpecies) {
         speciesMaps = new Dictionary<Species, Map> ();
         for (int i = 0; i < numSpecies; i++) {
             Species species = (Species) (1 << i);
             speciesMaps.Add (species, new Map (size, mapRegionSize));
-
             preyBySpecies.Add (species, new List<Species> ());
             predatorsBySpecies.Add (species, new List<Species> ());
         }
-
+    }
+    
+    void InitPreyAndPredatorRelationShip(int numSpecies) {
+        preyBySpecies = new Dictionary<Species, List<Species>> ();
+        predatorsBySpecies = new Dictionary<Species, List<Species>> ();
+        InitSpeciesMaps (numSpecies);
         // Store predator/prey relationships for all species
         for (int i = 0; i < initialPopulations.Length; i++) {
             if (!(initialPopulations[i].prefab is Animal)) continue;
@@ -211,36 +204,74 @@ public class Environment : MonoBehaviour {
                 }
             }
         }
+    }
 
-        LogPredatorPreyRelationships ();
+    List<Coord> GetWalkableNeighbours (int x, int y) {
+        List<Coord> walkableNeighbours = new List<Coord> ();
+        for (int offsetY = -1; offsetY <= 1; offsetY++) {
+            for (int offsetX = -1; offsetX <= 1; offsetX++) {
+                if (offsetX == 0 && offsetY == 0) continue;
+                int neighbourX = x + offsetX;
+                int neighbourY = y + offsetY;
 
-        SpawnTrees ();
+                if (neighbourX < 0) continue;
+                if (neighbourX >= size) continue;
+                if (neighbourY < 0) continue;
+                if (neighbourY >= size) continue;
+                if (!walkable[neighbourX, neighbourY]) continue;
 
+                walkableNeighbours.Add (new Coord (neighbourX, neighbourY));
+            }
+        }
+        return walkableNeighbours;
+    }
+
+    void InitWalkableNeighboursMap() {
         walkableNeighboursMap = new Coord[size, size][];
-
         // Find and store all walkable neighbours for each walkable tile on the map
         for (int y = 0; y < terrainData.size; y++) {
             for (int x = 0; x < terrainData.size; x++) {
                 if (!walkable[x, y]) continue;
-                List<Coord> walkableNeighbours = new List<Coord> ();
-                for (int offsetY = -1; offsetY <= 1; offsetY++) {
-                    for (int offsetX = -1; offsetX <= 1; offsetX++) {
-                        if (offsetX == 0 && offsetY == 0) continue;
-                        int neighbourX = x + offsetX;
-                        int neighbourY = y + offsetY;
-
-                        if (neighbourX < 0) continue;
-                        if (neighbourX >= size) continue;
-                        if (neighbourY < 0) continue;
-                        if (neighbourY >= size) continue;
-                        if (!walkable[neighbourX, neighbourY]) continue;
-
-                        walkableNeighbours.Add (new Coord (neighbourX, neighbourY));
-                    }
-                }
-                walkableNeighboursMap[x, y] = walkableNeighbours.ToArray ();
+                walkableNeighboursMap[x, y] = GetWalkableNeighbours(x, y).ToArray ();
             }
         }
+    }
+
+    void InitPopulationCount() {
+        populationBySpecies = new Dictionary<Species, int> ();
+        for (int i = 0; i < initialPopulations.Length; i++) {
+            var pop = initialPopulations[i];
+            var species = pop.prefab.species;
+            if (populationBySpecies.ContainsKey (species)) continue;
+            populationBySpecies.Add (species, pop.count);
+        }
+    }
+
+    void InitDeathCountByCause() {
+        deathCountByCause = new Dictionary<CauseOfDeath, int> ();
+        foreach (CauseOfDeath cause in (CauseOfDeath[])Enum.GetValues(typeof(CauseOfDeath))) {
+            deathCountByCause.Add (cause, 0);
+        }
+    }
+
+    // Call terrain generator and cache useful info
+    void Init () {
+        var sw = System.Diagnostics.Stopwatch.StartNew ();
+
+        var terrainGenerator = FindObjectOfType<TerrainGenerator> ();
+        terrainData = terrainGenerator.Generate ();
+
+        tileCentres = terrainData.tileCentres;
+        walkable = terrainData.walkable;
+        size = terrainData.size;
+        int numSpecies = Enum.GetNames (typeof (Species)).Length;
+
+        InitPopulationCount();
+        InitDeathCountByCause();
+        InitPreyAndPredatorRelationShip (numSpecies);
+        LogPredatorPreyRelationships ();
+        SpawnTrees ();
+        InitWalkableNeighboursMap();
 
         // Generate offsets within max view distance, sorted by distance ascending
         // Used to speed up per-tile search for closest water tile
@@ -279,12 +310,11 @@ public class Environment : MonoBehaviour {
                         break;
                     }
                 }
-                if (!foundWater) {
-                    closestVisibleWaterMap[x, y] = Coord.invalid;
-                }
+                if (foundWater) continue;
+                closestVisibleWaterMap[x, y] = Coord.invalid;
             }
         }
-        Debug.Log ("Init time: " + sw.ElapsedMilliseconds);
+        Debug.Log ("Init time: " + sw.ElapsedMilliseconds + "ms");
     }
 
     void SpawnTrees () {

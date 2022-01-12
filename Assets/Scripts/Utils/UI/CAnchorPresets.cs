@@ -1,0 +1,19 @@
+public enum CAnchorPresets
+{
+    TopLeft,
+    TopCenter,
+    TopRight,
+    MiddleLeft,
+    MiddleCenter,
+    MiddleRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+    StretchAll,
+    StretchLeft,
+    StretchRight,
+    StretchTop,
+    StretchBottom,
+    StretchCenter,
+    StretchMiddle
+}
