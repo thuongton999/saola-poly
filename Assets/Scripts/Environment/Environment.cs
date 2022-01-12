@@ -14,6 +14,13 @@ public class Environment : MonoBehaviour {
     [Range (0, 1)]
     public float treeProbability;
 
+    [Header ("Grass")]
+    public LivingEntity grassPrefab;
+    public float grassRespawnTime;
+    [Range (0, 1)]
+    public float grassProbability;
+    float lastGrassSpawnTime;
+
     [Header ("Populations")]
     public Population[] initialPopulations;
 
@@ -47,7 +54,16 @@ public class Environment : MonoBehaviour {
 
         Init ();
         SpawnInitialPopulations ();
+        lastGrassSpawnTime = Time.time;
+    }
 
+    void Update() {
+        if (Time.time - lastGrassSpawnTime > grassRespawnTime) {
+            lastGrassSpawnTime = Time.time;
+            // a litle bit hard code here, but it's ok
+            SpawnGrass (Species.Plant);
+            Debug.Log ("Spawned grass: " + (Time.time - lastGrassSpawnTime) + "ms");
+        }
     }
 
     void OnDrawGizmos () {
@@ -59,6 +75,19 @@ public class Environment : MonoBehaviour {
             }
         }
         */
+    }
+
+    public static void SpawnEnity(Coord coord, LivingEntity prefab, Genes genes = null) { 
+        var entity = Instantiate (prefab);
+        if (entity is Animal)
+            (entity as Animal).Init (coord, genes);
+        else
+            entity.Init (coord);
+        RegisterBirth (entity);
+    }
+
+    public static void RegisterBirth(LivingEntity entity) {
+        speciesMaps[entity.species].Add (entity, entity.coord);
     }
 
     public static void RegisterMove (LivingEntity entity, Coord from, Coord to) {
@@ -257,7 +286,7 @@ public class Environment : MonoBehaviour {
     // Call terrain generator and cache useful info
     void Init () {
         var sw = System.Diagnostics.Stopwatch.StartNew ();
-
+        
         var terrainGenerator = FindObjectOfType<TerrainGenerator> ();
         terrainData = terrainGenerator.Generate ();
 
@@ -360,6 +389,20 @@ public class Environment : MonoBehaviour {
         }
     }
 
+    void SpawnGrass(Species grassSpecies) {
+        var spawnPrng = new System.Random (seed);
+        var spawnCoords = new List<Coord> (walkableCoords);
+
+        if (spawnCoords.Count == 0) return;
+        if (spawnPrng.NextDouble() < grassProbability) return;
+
+        int spawnCoordIndex = spawnPrng.Next (0, spawnCoords.Count);
+        Coord coord = spawnCoords[spawnCoordIndex];
+        spawnCoords.RemoveAt (spawnCoordIndex);
+
+        SpawnEnity (coord, grassPrefab);
+    }
+
     void SpawnInitialPopulations () {
 
         var spawnPrng = new System.Random (seed);
@@ -374,11 +417,7 @@ public class Environment : MonoBehaviour {
                 int spawnCoordIndex = spawnPrng.Next (0, spawnCoords.Count);
                 Coord coord = spawnCoords[spawnCoordIndex];
                 spawnCoords.RemoveAt (spawnCoordIndex);
-
-                var entity = Instantiate (pop.prefab);
-                entity.Init (coord);
-
-                speciesMaps[entity.species].Add (entity, coord);
+                SpawnEnity (coord, pop.prefab);
             }
         }
     }
@@ -415,5 +454,4 @@ public class Environment : MonoBehaviour {
         public LivingEntity prefab;
         public int count;
     }
-
 }

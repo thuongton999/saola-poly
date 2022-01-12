@@ -2,9 +2,11 @@
     None,
     Resting,
     Exploring,
+    SearchingForMate,
     GoingToFood,
     GoingToWater,
+    GoingToMate,
     Eating,
     Drinking,
-    SearchingForMate
+    Reproducing,
 }

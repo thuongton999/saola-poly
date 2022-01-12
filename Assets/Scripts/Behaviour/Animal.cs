@@ -20,9 +20,12 @@ public class Animal : LivingEntity, IAnimalStateSubject {
     float moveSpeed = 1.5f;
     float timeToDeathByHunger = 200;
     float timeToDeathByThirst = 200;
+    float timeToReadyForReproduction = 200;
 
     public float drinkDuration { get; private set; } = 6;
     public float eatDuration { get; private set; } = 10;
+    public float reproduceDuration { get; private set; } = 15;
+    public float pregnantDuration { get; private set; } = 30;
 
     float criticalPercent = 0.7f;
 
@@ -33,9 +36,11 @@ public class Animal : LivingEntity, IAnimalStateSubject {
     [Header ("State")]
     public float hunger;
     public float thirst;
+    public float reproductiveUrge;
     List<IAnimalStateObserver> stateObservers = new List<IAnimalStateObserver> ();
 
     protected LivingEntity foodTarget;
+    protected Animal mateTarget;
     protected Coord waterTarget;
 
     // Move data:
@@ -50,6 +55,11 @@ public class Animal : LivingEntity, IAnimalStateSubject {
     Coord[] path;
     int pathIndex;
 
+    // Reproduction data:
+    // female only
+    bool isPregnant;
+    float pregnantStartTime;
+
     // Other
     float lastActionChooseTime;
     const float sqrtTwo = 1.4142f;
@@ -59,6 +69,19 @@ public class Animal : LivingEntity, IAnimalStateSubject {
         base.Init (coord);
         moveFromCoord = coord;
         genes = Genes.RandomGenes (1);
+
+        material.color = (genes.isMale) ? maleColour : femaleColour;
+
+        ChooseNextAction ();
+    }
+
+    public virtual void Init(Coord coord, Genes genes) {
+        base.Init (coord);
+        moveFromCoord = coord;
+        if (genes == null) {
+            genes = Genes.RandomGenes (1);
+        }
+        this.genes = genes;
 
         material.color = (genes.isMale) ? maleColour : femaleColour;
 
@@ -84,6 +107,7 @@ public class Animal : LivingEntity, IAnimalStateSubject {
         // Increase hunger and thirst over time
         hunger += Time.deltaTime * 1 / timeToDeathByHunger;
         thirst += Time.deltaTime * 1 / timeToDeathByThirst;
+        reproductiveUrge += Time.deltaTime * 1 / timeToReadyForReproduction;
 
         // Animate movement. After moving a single tile, the animal will be able to choose its next action
         if (animatingMovement) {
@@ -95,6 +119,11 @@ public class Animal : LivingEntity, IAnimalStateSubject {
             if (timeSinceLastActionChoice > timeBetweenActionChoices) {
                 ChooseNextAction ();
             }
+            float timeSincePregnant = Time.time - pregnantStartTime;
+            if (!genes.isMale && isPregnant && timeSincePregnant > pregnantDuration) {
+                GiveBirth ();
+                isPregnant = false;
+            }
         }
 
         NotifyObservers ();
@@ -102,6 +131,8 @@ public class Animal : LivingEntity, IAnimalStateSubject {
             Die (CauseOfDeath.Hunger);
         } else if (thirst >= 1) {
             Die (CauseOfDeath.Thirst);
+        } else if (reproductiveUrge >= 1) {
+            reproductiveUrge = 1;
         }
     }
 
@@ -109,21 +140,36 @@ public class Animal : LivingEntity, IAnimalStateSubject {
     // or, when not moving (e.g interacting with food etc), at a fixed time interval
     protected virtual void ChooseNextAction () {
         lastActionChooseTime = Time.time;
-        // Get info about surroundings
 
+        bool currentlyEating = (currentAction == CreatureAction.Eating && foodTarget && hunger > 0);
+        bool currentlyDrinking = (currentAction == CreatureAction.Drinking && waterTarget != Coord.invalid && thirst > 0);
         // Decide next action:
-        // Eat if (more hungry than thirsty) or (currently eating and not critically thirsty)
-        bool currentlyEating = currentAction == CreatureAction.Eating && foodTarget && hunger > 0;
+        
+        // if (more hungry than thirsty) or (currently eating and not critically thirsty)
         if (hunger >= thirst || currentlyEating && thirst < criticalPercent) {
             FindFood ();
         }
-        // More thirsty than hungry
-        else {
+        // more thirsty than hungry
+        else if (thirst >= reproductiveUrge || currentlyDrinking) {
             FindWater ();
+        }
+        // extremely h*rny
+        else {
+            FindMate ();
         }
 
         Act ();
+    }
 
+    protected virtual void FindMate () {
+        List<Animal> mateTargets = Environment.SensePotentialMates(coord, this);
+        if (mateTargets.Count > 0) {
+            currentAction = CreatureAction.GoingToMate;
+            // mateTarget = ChooseBestTarget (mateTargets);
+            // CreatePath(mateTarget.coord);
+            return;
+        }
+        currentAction = CreatureAction.SearchingForMate;
     }
 
     protected virtual void FindFood () {
@@ -132,10 +178,9 @@ public class Animal : LivingEntity, IAnimalStateSubject {
             currentAction = CreatureAction.GoingToFood;
             foodTarget = foodSource;
             CreatePath (foodTarget.coord);
-
-        } else {
-            currentAction = CreatureAction.Exploring;
+            return;
         }
+        currentAction = CreatureAction.Exploring;
     }
 
     protected virtual void FindWater () {
@@ -144,10 +189,9 @@ public class Animal : LivingEntity, IAnimalStateSubject {
             currentAction = CreatureAction.GoingToWater;
             waterTarget = waterTile;
             CreatePath (waterTarget);
-
-        } else {
-            currentAction = CreatureAction.Exploring;
-        }
+            return;
+        } 
+        currentAction = CreatureAction.Exploring;
     }
 
     // When choosing from multiple food sources, the one with the lowest penalty will be selected
@@ -175,6 +219,12 @@ public class Animal : LivingEntity, IAnimalStateSubject {
                 break;
             case CreatureAction.GoingToWater:
                 GoingToDo (waterTarget, CreatureAction.Drinking);
+                break;
+            case CreatureAction.SearchingForMate:
+                StartMoveToCoord (Environment.GetNextTileWeighted (coord, moveFromCoord));
+                break;
+            case CreatureAction.GoingToMate:
+                GoingToDo (mateTarget.coord, CreatureAction.Reproducing);
                 break;
         }
     }
@@ -221,6 +271,10 @@ public class Animal : LivingEntity, IAnimalStateSubject {
                 if (thirst <= 0) return;
                 Drink ();
                 break;
+            case CreatureAction.Reproducing:
+                if (!mateTarget || reproductiveUrge <= 0) return;
+                Reproduce ();
+                break;
         }
     }
 
@@ -230,9 +284,30 @@ public class Animal : LivingEntity, IAnimalStateSubject {
         hunger -= eatAmount;
     }
 
-    public virtual void Drink() {
+    public virtual void Drink () {
         thirst -= Time.deltaTime * 1 / drinkDuration;
         thirst = Mathf.Clamp01 (thirst);
+    }
+
+    public virtual void Reproduce () {
+        reproductiveUrge -= Time.deltaTime * 1 / reproduceDuration;
+        reproductiveUrge = Mathf.Clamp01 (reproductiveUrge);
+        if (genes.isMale) return;
+        Pregnant();
+    }
+
+    public virtual void Pregnant () {
+        if (isPregnant) return;
+        isPregnant = true;
+        pregnantStartTime = Time.time;
+    }
+
+    public virtual void GiveBirth () {
+        if (mateTarget == null) {
+            isPregnant = false;
+            return;
+        }
+        Environment.SpawnEnity (coord, mateTarget, Genes.InheritedGenes (genes, mateTarget.genes));
     }
 
     void AnimateMove () {
@@ -274,6 +349,13 @@ public class Animal : LivingEntity, IAnimalStateSubject {
         if (currentAction == CreatureAction.GoingToWater) {
             var path = EnvironmentUtility.GetPath (coord.x, coord.y, waterTarget.x, waterTarget.y);
             Gizmos.color = Color.white;
+            for (int i = 0; i < path.Length-1; i++)
+                Gizmos.DrawSphere (Environment.tileCentres[path[i].x, path[i].y], .2f);
+        }
+
+        if (currentAction == CreatureAction.GoingToMate) {
+            var path = EnvironmentUtility.GetPath (coord.x, coord.y, mateTarget.coord.x, mateTarget.coord.y);
+            Gizmos.color = Color.magenta;
             for (int i = 0; i < path.Length-1; i++)
                 Gizmos.DrawSphere (Environment.tileCentres[path[i].x, path[i].y], .2f);
         }

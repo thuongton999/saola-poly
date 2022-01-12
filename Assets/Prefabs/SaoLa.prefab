@@ -289,6 +289,7 @@ MonoBehaviour:
   femaleColour: {r: 0, g: 0, b: 0, a: 0}
   hunger: 0
   thirst: 0
+  reproductiveUrge: 0
   SaoLaStats: {fileID: 6138067794691010490}
 --- !u!1 &1783559134390275242
 GameObject:
@@ -1411,7 +1412,7 @@ PrefabInstance:
     - target: {fileID: 5375925350523544935, guid: c26f797f45e4fd14bbb42eeff0818d05,
         type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0.6
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 5375925350523544935, guid: c26f797f45e4fd14bbb42eeff0818d05,
         type: 3}
@@ -1456,7 +1457,7 @@ PrefabInstance:
     - target: {fileID: 5375925350523544935, guid: c26f797f45e4fd14bbb42eeff0818d05,
         type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 1.3
+      value: 1.4
       objectReference: {fileID: 0}
     - target: {fileID: 5375925350523544935, guid: c26f797f45e4fd14bbb42eeff0818d05,
         type: 3}

@@ -145,6 +145,7 @@ MonoBehaviour:
   femaleColour: {r: 1, g: 0.34572592, b: 0, a: 1}
   hunger: 0
   thirst: 0
+  reproductiveUrge: 0
   foxStats: {fileID: 4226717649463208531}
 --- !u!1001 &1349986509218549939
 PrefabInstance:
@@ -221,7 +222,7 @@ PrefabInstance:
     - target: {fileID: 5375925350523544935, guid: c26f797f45e4fd14bbb42eeff0818d05,
         type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0.6
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 5375925350523544935, guid: c26f797f45e4fd14bbb42eeff0818d05,
         type: 3}

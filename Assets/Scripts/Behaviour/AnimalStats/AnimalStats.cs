@@ -8,6 +8,7 @@ using TMPro;
 public class AnimalStats : MonoBehaviour, IAnimalStateObserver {
 	public StatBar hungerBar;
 	public StatBar thirstBar;
+	public StatBar reproductiveUrgeBar;
 	public TextMeshProUGUI actionText;	
 
 	void OnValidate() {
@@ -15,6 +16,8 @@ public class AnimalStats : MonoBehaviour, IAnimalStateObserver {
 			Debug.Log("Hunger bar not set");
 		if (thirstBar == null)
 			Debug.Log("Thirst bar not set");
+		if (reproductiveUrgeBar == null)
+			Debug.Log("Reproductive urge bar not set");
 		if (actionText == null)
 			Debug.Log("Action text not set");
 		if (GetComponent<Canvas>() == null) {
@@ -34,6 +37,7 @@ public class AnimalStats : MonoBehaviour, IAnimalStateObserver {
 			Animal animal = (Animal)subject;
 			hungerBar.SetValue(animal.hunger);
 			thirstBar.SetValue(animal.thirst);
+			reproductiveUrgeBar.SetValue(animal.reproductiveUrge);
 			actionText.text = animal.currentAction.ToString();
 		}
 	}

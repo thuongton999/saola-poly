@@ -116,7 +116,7 @@ public class WindowGraph : MonoBehaviour
         dotObject.transform.SetParent(graphContainer, false);
         dotObject.GetComponent<Image>().sprite = circleSprite;
         if (!viewDot && !cViewDot)
-            dotObject.GetComponent<Image>().color = new Color(1, 1, 1, 0); // transparent
+            dotObject.GetComponent<Image>().color = Color.clear; // transparent
         if (viewValue && cViewValue)
             CreateText(value.ToString(), CTextAlignment.Top, valueSize).transform.SetParent(dotObject.transform, false);
         RectTransform rectTransform = dotObject.GetComponent<RectTransform>();
